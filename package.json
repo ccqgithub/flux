@@ -1,0 +1,30 @@
+{
+  "name": "s-flux",
+  "version": "0.0.2",
+  "description": "A `simple flux` lib",
+  "main": "dist/s-flux.common.js",
+  "keywords": [
+    "flux",
+    "simple flux",
+    "s-flux"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ccqgithub/s-flux.git"
+  },
+  "author": "Season Chen",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ccqgithub/s-flux/issues"
+  },
+  "homepage": "https://github.com/ccqgithub/s-flux#readme",
+  "devDependencies": {
+    "rollup": "^0.26.3",
+    "rollup-plugin-babel": "^1.0.0",
+    "rollup-plugin-replace": "^1.1.0",
+    "uglify-js": "^2.6.2"
+  }
+}

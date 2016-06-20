@@ -1,18 +1,72 @@
-// store Class
-function StoreClass(initialState, reducer) {
-  this._callbacks = [];
-  this._isDispatching = false;
-  this._state = initialState;
-  this._reducer = reducer;
-}
+class Store {
 
-StoreClass.prototype = {
-  // get state
+  // store constructor
+  constructor({
+    debug = process.env.NODE_ENV == 'production' ? true : false,
+
+    // initialState of the store
+    initialState = {},
+
+    // update store's state, action = {type,params}
+    mutation = function(state, action) {
+      return state;
+    },
+
+    // this child store map, {childKey: childStore}
+    children = {},
+
+    // immutable the store's state, default just return the state
+    immutable = function(state) {
+      return state
+    },
+
+    name: 'SFlux Store'
+  }) {
+    // check
+    if (typeof initialState != 'object')
+      throw new Error('The `initialState` must be pure object!');
+
+    if (typeof mutation != 'function')
+      throw new Error('The `mutation` must be pure function!');
+
+    if (typeof immutable != 'function')
+      throw new Error('The `immutable` must be pure function!');
+
+    Object.keys(children).forEach(function(key) {
+      var store = children[key];
+
+      if (typeof key != 'string') {
+        throw new Error('The key of `children` must be string!');
+      }
+
+      if (!store._isSFluxInstance) {
+        throw new Error('The value of `children` must be `Store instance`!');
+      }
+    });
+
+    this.name = name;
+    this._callbacks = [];
+    this._isDispatching = false;
+    this._mutation = mutation;
+    this._children = children;
+    this._immutable = immutable;
+    this._isSFluxInstance = true;
+    this._debug = debug;
+
+    // init state
+    this._state = initialState;
+    Object.keys(children).forEach(function(key) {
+      var store = children[key];
+      this._state[key] = store.getState();
+    });
+  }
+
+  // get store state
   getState() {
     return this._state;
-  },
+  }
 
-  // 分配action action = {type, data}
+  // action = {type, params}
   dispatch(action) {
     var state,
       nextState;
@@ -22,25 +76,28 @@ StoreClass.prototype = {
     }
 
     this._isDispatching = true;
+
+    Object.keys(this._children).forEach(function(key) {
+      var store = this._children[key];
+      store.dispatch(key);
+      this._state[key] = store.getState();
+    });
+
     state = this.getState();
-    nextState = this._reducer(state, action);
+    nextState = this._mutation(state, action);
     this._state = this._immutable(nextState);
     this.emitChange();
     this._isDispatching = false;
     state = nextState = null;
-  },
-
-  // immutable
-  _immutable(state) {
-    return state;
-  },
+  }
 
   // emitChange
   emitChange() {
+    var store = this;
     this._callbacks.forEach(function(callback) {
-      callback();
+      callback(store);
     });
-  },
+  }
 
   // subscribe
   subscribe(callback) {
@@ -63,19 +120,25 @@ StoreClass.prototype = {
       isSubscribed = false;
     }
   }
+
+  // 打印调试信息
+  log(type, data) {
+    if (!this._debug) return;
+
+    switch(type) {
+      case 'before action':
+        console.log();
+        break;
+      case 'action':
+        console.log();
+        break;
+      case 'after action':
+        console.log();
+        break;
+      default:
+        console.log(this.getState());
+    }
+  }
 }
 
-// store creator
-export function createStore(initialState, reducer) {
-  var storeInstance;
-
-  if (typeof initialState != 'object')
-    throw new Error('the first argument `initialState` must be a pure object !');
-
-  if (typeof reducer != 'function')
-    throw new Error('the second argument `reducer` must be a pure function !');
-
-  storeInstance = new StoreClass(initialState, reducer);
-
-  return storeInstance;
-}
+export {Store};

@@ -1,8 +1,11 @@
+import {warning, error} from './util/debug';
+import {uid, deepClone} from './util/fun';
+
+// class store
 class Store {
 
   // store constructor
   constructor({
-    debug = process.env.NODE_ENV == 'production' ? true : false,
 
     // initialState of the store
     initialState = {},
@@ -13,52 +16,69 @@ class Store {
     },
 
     // this child store map, {childKey: childStore}
-    children = {},
+    mixins = {},
 
-    // immutable the store's state, default just return the state
-    immutable = function(state) {
-      return state
-    },
+    // middlewares
+    middlewares: [],
 
-    name: 'SFlux Store'
+    // store name
+    name: 'store'
   }) {
+    this.name = name;
+    this.id = uid('store-' + name);
+    this._cloneOptions = {};
+
+    // set options to clone
+    Object.keys(arguments[0]).forEach(function(key) {
+      this._cloneOptions = deepClone(arguments[0][key]);
+    }.bind(this));
+
     // check
     if (typeof initialState != 'object')
-      throw new Error('The `initialState` must be pure object!');
+      this._error('The `initialState` must be pure object!');
 
     if (typeof mutation != 'function')
-      throw new Error('The `mutation` must be pure function!');
+      this._error('The `mutation` must be pure function!');
 
     if (typeof immutable != 'function')
-      throw new Error('The `immutable` must be pure function!');
+      this._error('The `immutable` must be pure function!');
 
-    Object.keys(children).forEach(function(key) {
-      var store = children[key];
+    Object.keys(mixins).forEach(function(key) {
+      var store = mixins[key];
 
       if (typeof key != 'string') {
-        throw new Error('The key of `children` must be string!');
+        this._error('The key of `mixins` must be string!');
       }
 
       if (!store._isSFluxInstance) {
-        throw new Error('The value of `children` must be `Store instance`!');
+        this._error('The value of `mixins` must be `Store instance`!');
       }
-    });
 
-    this.name = name;
+      mixins[key] = store.clone();
+    }.bind(this));
+
     this._callbacks = [];
-    this._isDispatching = false;
     this._mutation = mutation;
-    this._children = children;
-    this._immutable = immutable;
+    this._mixins = mixins;
+    this._middlewares = middlewares;
     this._isSFluxInstance = true;
-    this._debug = debug;
+
+    this._isDispatching = false;
+    this._isDispatched = false;
 
     // init state
     this._state = initialState;
     Object.keys(children).forEach(function(key) {
       var store = children[key];
       this._state[key] = store.getState();
-    });
+    }.bind(this));
+
+    // middlewares
+    this._middlewares.forEach(function(middleware) {
+      if (typeof middleware.onInit === 'function') {
+        middleware.onInit(this._state, this);
+      }
+    }.bind(this));
   }
 
   // get store state
@@ -72,23 +92,43 @@ class Store {
       nextState;
 
     if (this._isDispatching) {
-      throw new Error('can not dispatch in the middle of another dispatch !');
+      error('<Store> Can not make another dispatch in one dispatch in the store!');
     }
 
     this._isDispatching = true;
-
+    this._isDispatched = true;
     Object.keys(this._children).forEach(function(key) {
       var store = this._children[key];
-      store.dispatch(key);
-      this._state[key] = store.getState();
-    });
+      store._isDispatched = false;
+    }.bind(this));
+
+    // middlewares
+    this._middlewares.forEach(function(middleware) {
+      if (typeof middleware.beforeMutation === 'function') {
+        middleware.beforeMutation(action, this._state, this);
+      }
+    }.bind(this));
 
     state = this.getState();
     nextState = this._mutation(state, action);
-    this._state = this._immutable(nextState);
+
+    Object.keys(this._children).forEach(function(key) {
+      var store = this._children[key];
+      if (!store._isDispatched) {
+        store.dispatch(key);
+        this._state[key] = store.getState();
+      }
+    });
+
+    // middlewares
+    this._middlewares.forEach(function(middleware) {
+      if (typeof middleware.onMutation === 'function') {
+        middleware.onMutation(action, this._state, this);
+      }
+    }.bind(this));
+
     this.emitChange();
     this._isDispatching = false;
-    state = nextState = null;
   }
 
   // emitChange
@@ -106,7 +146,7 @@ class Store {
     var isSubscribed = true;
 
     if (index != -1)
-      throw new Error('the callback function has been subscribed !');
+      this._error('The callback function has been subscribed!');
 
     callbacks.push(callback);
 
@@ -121,23 +161,22 @@ class Store {
     }
   }
 
-  // 打印调试信息
-  log(type, data) {
-    if (!this._debug) return;
+  // 提前触发一个mixin
+  mixin(key, action={}) {
+    var store = this._mixins[key];
+    if (!store) this._error('The mixin<'+ key +'> not registed in the store!');
+    if (store._isDispatched) return;
+    store.dispatch(action);
+    this._state[key] = store.getState();
+  }
 
-    switch(type) {
-      case 'before action':
-        console.log();
-        break;
-      case 'action':
-        console.log();
-        break;
-      case 'after action':
-        console.log();
-        break;
-      default:
-        console.log(this.getState());
-    }
+  // 从初始状态复制一个store
+  clone() {
+    return new Store(this._cloneOptions);
+  }
+
+  _error(message) {
+    error('<Store: ' + this.id + '> ' + message);
   }
 }
 

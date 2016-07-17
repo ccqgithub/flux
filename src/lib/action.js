@@ -1,26 +1,56 @@
-import {dispatch} from './dispatcher';
+import {getGlobalStore} from './tool';
 
 // create action
-export function createAction(actionType, actionFn) {
-  return function(...args) {
-    var result;
+export function createAction(actionFn) {
+  return function(params, store) {
+    var doneCallbacks = [],
+      errorCallbacks = [],
+      finallyCallbacks = [];
+      eventCallbacks = {},
+      doneData = null,
+      errorData = null,
+      proc,
+      result;
+
+    _process = {
+      done(data) {
+        if (_doneData) return;
+        _doneData = data;
+        if (_doneCallback) _doneCallback(_doneData);
+        if (_finallyCallback) _finallyCallback();
+      },
+      error(error) {
+        if (_errorData) return;
+        _errorData = error;
+        if (_errorCallback) _errorCallback(_doneData);
+        if (_finallyCallback) _finallyCallback();
+      },
+      trigger(event, data) {
+
+      }
+    }
 
     // 执行action函数
-    result = actionFn(...args);
+    actionFn(params, store, _process);
 
-    // 每个action 执行后会得到一个promise对象
-    return new Promise(function(resolve, reject) {
-      if (typeof result === 'object' && result !== null && typeof result.then === 'function') {
-        // 异步action
-        result.then(function(data) {
-          dispatch({type: actionType, data: data});
-          resolve();
-        }).catch(reject);
-      } else {
-        // 同步action
-        dispatch({type: actionType, data: result});
-        resolve();
+    result = {
+      done(fn) {
+        _doneCallback = fn;
+        if (_doneData) _doneCallback(_doneData);
+      },
+      error() {
+        _errorCallback = fn;
+        if (_errorData) _errorCallback(_errorData);
+      },
+      finally() {
+        _finallyCallback = fn;
+        if (_doneData || _errorData) _finallyCallback();
+      },
+      on() {
+
       }
-    });
+    }
+
+    return result;
   }
 }

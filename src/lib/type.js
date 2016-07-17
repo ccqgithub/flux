@@ -8,3 +8,8 @@ export function createActionTypes(types = []) {
   });
   return typesObj;
 }
+
+// 创建一个action types
+export function createActionType(type) {
+  return uid('action-type-' + type);
+}

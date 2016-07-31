@@ -1,154 +1,118 @@
-# flux：a simple flux lib
+# s-flux：a simple flux lib (测试版)
 
 ## 介绍
 
 > 一个简单的flux工具库，支持单页应用和多页应用，支持同步action和异步action。
 
-> flux结构：Actions + pageStore + Reducers + Components。
+## 安装
 
-- Actions: 分为页面action和公用action。页面action为每个页面独自使用，公用action一般被公用的组件调用。页面也可以调用公用的action，但组件必须调用公用action。所有action都会返回一个promsie对象。
+> 依赖'es6-promise', npm模块指向`dist/s-flux.common.js`。
+> `dist/s-flux.js`和`dis/s-flux.min.js`为浏览器直接引用，为UMD模块，`es6-promise`已经打包在内。
 
-- pageStore：一个页面有且只有一个store。
+- 浏览器直接引用：
 
-- reducer：公用的辅助store的**pure function**, 用于辅助更新state的一个分支。
-
-- Components：组件，一般不直接使用store，而是通过父组件传属性的方式使用store中的数据。在组件中，可以调用公用action，公用action会被分配到当前页面的store。
-
-# 依赖
-
-依赖 ES6 的`Promise`，如果你采用es6语法，不需要另外加载依赖。如果不是使用es6语法，需要调用之前引入相应的polyfill，推荐`es-promise`模块。
-
-# 安装
-
-- npm 安装
-
-`dist/s-flux.common.js`是CommonJS模块。`dist/s-flux.js`和`dist/s-flux.min.js`是UMD规范的模块，可以在浏览器直接使用。
-
-```javascript
-npm install 's-flux';
-
-//===
-import {createAction, createStore} from 's-flux'
-```
-
-- 直接引入js, 支持
-
-```javascript
-<script src="dist/s-flux.js"></script>
+``` html
+<script src="s-flux/dist/s-flux.min.js"></script>
 <script>
-  var createAction = sFlux.createAction;
+var Store = SFlux.Store;
+var createAction = SFlux.createAction;
+//...
 </script>
 ```
 
-# 使用方法
+- commonjs模块引用:
 
-- `createStore(initialState, reducer)`, 创建一个全局store，返回一个store实例。对于单页app，整个应用只有一个store。对于普通的多页应用，每个页面对于一个全局store。参数`initialState`表示store初始状态，`reducer`为所有action的入口，它的返回值为store的下一个状态。具体见下方示例：
+``` js
+import {Store, createAction} form 's-flux';
+// or
+var SFlux = require('s-flux');
+```
+
+## API
+
+- Store: 数据仓库基类
 
 ```javascript
-// IndexStore.js
-import objectAssign from 'object-assign';
-import {createSotre} from 's-flux';
-import * as IndexActions from './actions/IndexActions';
-import * as FeedActions from './actions/FeedActions';
-import {filterFeeds} from './reducers/FeedReducers';
+// app-store.js
+import {Store} from 's-flux';
 
-// 为首页创建一个store
-// 第一个参数initialState应该为一个`pure object`。
-// 第二个参数reducer负责在每一个action发生时更新store的状态，它的返回值为store的下一个状态。
-// 注意：整个reducer执行过程中是同步的，期间不能调用其他action。
-var IndexStore = createSotre({
-  user: {
-    name: 'season',
-    age: 18
+// 创建一个store
+var appStore = module.exports = new Store({
+  // 初始化状态
+  initialState = {},
+
+  // 数据更新: mutation => {type: 'mutation type', data: 'mutation data'}
+  mutation = function(state, mutation) {
+    return state;
   },
-  feeds: [],
-  showFeeds: [],
-}, function(state, action) {
-  // reducer 接受两个参数，第一个为当前的store的状态，第二个为action。
-  // action.type: action类型
-  // action.data: action参数
 
-  // 注意：这里不直接操作store的state，而是返回一个新的对象, 对象可以用Object.assign()，数组用Array.map();
-  var data = action.data;
+  // 子模块：{key: childStore}
+  modules = {},
 
-  switch (action.type) {
-    case IndexActions.CHG_USER_NAME:
-      // 此处的data为新的user name
-      return objectAssign({}, state, {
-        user: objectAssign({}, state.user, {
-          name: data
-        })
-      });
-      break;
-    case IndexActions.FILTER_FEEDS:
-      // 此处的data为filter condition
-      return objectAssign({}, state, {
-        showFeeds: filterFeeds(state.feeds, data)
-      });
-      break;
-    default:
-      return state;
-  }
+  // 中间件
+  middlewares = [],
+
+  // store名，便于调试用
+  name = 'store'
 });
 ```
 
-- `createAction(actionType, actionFn)`: 创建一个action。
+- createMutationTypes: 创建一组数据更新常量
 
-```javascript
-// IndexActions.js
+``` javascript
+// mutation-types.js
+import {createMutationTypes} from 's-flux';
+
+module.exports = createMutationTypes({
+  'INCREMENT',
+  'DECREMENT',
+  'OTHER',
+  'BEFORE_SUBMIT',
+  'SUBMIT'
+});
+```
+
+- createAction: 创建一个action
+
+``` javascript
+// actions.js
 import {createAction} from 's-flux';
 
-export const CHG_USER_NAME = 'CHG_USER_NAME';
-export const FETCH_FEEDS = 'FETCH_FEEDS';
+export var submit = createAction(function(params, {store, error, dispatch}) {
+  dispatch({
+    type: 'BEFORE_SUBMIT'
+  }, true);
 
-// 同步action, 返回的值会传给`action.data`
-export var changeUserName = createAction(CHG_USER_NAME, function(name) {
-  return name;
-});
-
-// 异步action, 返回一个promise，它的resolve值会传给`action.data`
-export var fetchFeeds = createAction(FETCH_FEEDS, function(page, count) {
-  return new Promise(function(resolve, reject) {
-    setTimeout(function() {
-      resolve([{}]); //
-    }, 300);
+  //异步action
+  setTimeout(function() {
+    dispatch({
+      type: 'SUBMIT',
+      data: '111'
+    });
   });
 });
 
 ```
 
-- `registerStore(store)`: 为当前页面注册一个全局store。注意：在任何action被调用之前注册store，否则action不知道dispatch去哪个store。
+- setGlobalStore: 注册一个全局store, 这样不要每次调用action的时候传入
 
-```javascript
-// index.jsx
-import {registerStore} from 's-flux';
-import IndexStore from './stores/IndexStore';
-import IndexActions from './actions/IndexActions';
+``` javascript
+// app.js
+import {setGlobalStore} from 's-flux';
+import appStore from './app-store';
+import mutationTypes from './mutation-types';
+import {submit} from './actions';
 
-// register store
-registerStore(IndexStore);
+// 注册全局store
+setGlobalStore(appStore);
 
 // 调用action
-IndexActions
-  .changeUserName('ddd')
-  .then(function() {
-    // success
+console.log('loading……')
+submit({})
+  .then(function(data) {
+    console.log('success……')
   })
-  .catch(function(reason) {
-    // error
+  .catch(function(error) {
+    /console.log('error……')
   });
-
-```
-
-- reducers:
-
-```javascript
-// FeedReducers.js
-
-export function filterFeeds(fees, condition) {
-  return feeds.filter(function(item) {
-    return item.tag == condition;
-  });
-}
-
 ```

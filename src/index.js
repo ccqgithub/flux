@@ -1,5 +1,12 @@
-import {registerStore, unregisterStore} from './lib/dispatcher';
+import {setGlobalStore, getGlobalStore} from './lib/tool';
 import {createAction} from './lib/action';
-import {createStore} from './lib/store';
+import {Store} from './lib/store';
+import {createMutationTypes} from './lib/type';
 
-export {registerStore, unregisterStore, createAction, createStore};
+export {
+  setGlobalStore,
+  getGlobalStore,
+  createAction,
+  createMutationTypes,
+  Store
+};

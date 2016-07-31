@@ -10,19 +10,19 @@ class Store {
     // initialState of the store
     initialState = {},
 
-    // update store's state, action = {type,params}
-    mutation = function(state, action) {
+    // update store's state, mutation = {type,data}
+    mutation = function(state, mutation) {
       return state;
     },
 
-    // this child store map, {childKey: childStore}
-    mixins = {},
+    // this child store modules, {childKey: childStore}
+    modules = {},
 
     // middlewares
-    middlewares: [],
+    middlewares = [],
 
     // store name
-    name: 'store'
+    name = 'store'
   }) {
     this.name = name;
     this.id = uid('store-' + name);
@@ -40,26 +40,23 @@ class Store {
     if (typeof mutation != 'function')
       this._error('The `mutation` must be pure function!');
 
-    if (typeof immutable != 'function')
-      this._error('The `immutable` must be pure function!');
-
-    Object.keys(mixins).forEach(function(key) {
-      var store = mixins[key];
+    Object.keys(modules).forEach(function(key) {
+      var store = modules[key];
 
       if (typeof key != 'string') {
-        this._error('The key of `mixins` must be string!');
+        this._error('The key of `modules` must be string!');
       }
 
       if (!store._isSFluxInstance) {
-        this._error('The value of `mixins` must be `Store instance`!');
+        this._error('The value of `modules` must be `Store instance`!');
       }
 
-      mixins[key] = store.clone();
+      modules[key] = store.clone();
     }.bind(this));
 
     this._callbacks = [];
     this._mutation = mutation;
-    this._mixins = mixins;
+    this._modules = modules;
     this._middlewares = middlewares;
     this._isSFluxInstance = true;
 
@@ -68,8 +65,8 @@ class Store {
 
     // init state
     this._state = initialState;
-    Object.keys(children).forEach(function(key) {
-      var store = children[key];
+    Object.keys(modules).forEach(function(key) {
+      var store = modules[key];
       this._state[key] = store.getState();
     }.bind(this));
 
@@ -86,8 +83,8 @@ class Store {
     return this._state;
   }
 
-  // action = {type, params}
-  dispatch(action) {
+  // mutation = {type, data}
+  dispatch(mutation) {
     var state,
       nextState;
 
@@ -97,33 +94,33 @@ class Store {
 
     this._isDispatching = true;
     this._isDispatched = true;
-    Object.keys(this._children).forEach(function(key) {
-      var store = this._children[key];
+    Object.keys(this._modules).forEach(function(key) {
+      var store = this._modules[key];
       store._isDispatched = false;
     }.bind(this));
 
     // middlewares
     this._middlewares.forEach(function(middleware) {
-      if (typeof middleware.beforeMutation === 'function') {
-        middleware.beforeMutation(action, this._state, this);
+      if (typeof middleware.onBeforeMutation === 'function') {
+        middleware.onBeforeMutation(mutation, this._state, this);
       }
     }.bind(this));
 
     state = this.getState();
-    nextState = this._mutation(state, action);
+    nextState = this._mutation(state, mutation);
 
-    Object.keys(this._children).forEach(function(key) {
-      var store = this._children[key];
+    Object.keys(this._modules).forEach(function(key) {
+      var store = this._modules[key];
       if (!store._isDispatched) {
-        store.dispatch(key);
+        store.dispatch(mutation);
         this._state[key] = store.getState();
       }
-    });
+    }.bind(this));
 
     // middlewares
     this._middlewares.forEach(function(middleware) {
       if (typeof middleware.onMutation === 'function') {
-        middleware.onMutation(action, this._state, this);
+        middleware.onMutation(mutation, this._state, this);
       }
     }.bind(this));
 
@@ -161,12 +158,12 @@ class Store {
     }
   }
 
-  // 提前触发一个mixin
-  mixin(key, action={}) {
+  // 提前触发一个module
+  module(key, mutation={}) {
     var store = this._mixins[key];
-    if (!store) this._error('The mixin<'+ key +'> not registed in the store!');
+    if (!store) this._error('The modules<'+ key +'> not registed in the store!');
     if (store._isDispatched) return;
-    store.dispatch(action);
+    store.dispatch(mutation);
     this._state[key] = store.getState();
   }
 

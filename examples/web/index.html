@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Example</title>
+</head>
+<body>
+
+  <input type="text" id="num">
+  <button type="button" id="increment">increment</button>
+  <button type="button" id="decrement">decrement</button>
+
+  <script src="../../dist/s-flux.js"></script>
+  <script src="./js/mutation-types.js"></script>
+  <script src="./js/actions.js"></script>
+  <script src="./js/store.js"></script>
+  <script>
+    console.log(SFlux)
+    var $num = document.getElementById('num');
+    var $increment = document.getElementById('increment');
+    var $decrement = document.getElementById('decrement');
+
+    //
+    SFlux.setGlobalStore(appStore);
+
+    function setNum() {
+      $num.value = appStore.getState().num;
+    }
+
+    $increment.addEventListener('click', function() {
+      incrementAction();
+      setNum();
+    });
+
+    $decrement.addEventListener('click', function() {
+      decrementAction();
+      setNum();
+    });
+
+    decrementAction(null, appStore);
+    setNum();
+  </script>
+</body>
+</html>

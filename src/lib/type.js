@@ -1,15 +1,15 @@
 import {uid} from './util/fun';
 
-// 创建一组action types
-export function createActionTypes(types = []) {
+// 创建一组mutation types
+export function createMutationTypes(types = []) {
   let typesObj = {};
   types.forEach(function(type) {
-    typesObj[type] = uid('action-type-' + type);
+    typesObj[type] = uid('mutation-type-' + type);
   });
   return typesObj;
 }
 
-// 创建一个action types
-export function createActionType(type) {
-  return uid('action-type-' + type);
+// 创建一个mutation types
+export function createMutationType(type) {
+  return uid('mutation-type-' + type);
 }
